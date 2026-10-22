@@ -31,7 +31,8 @@ An enterprise-grade, responsive e-commerce product catalog built with **Next.js 
 7. [Getting Started & Installation](#-getting-started--installation)
 8. [Available Scripts](#-available-scripts)
 9. [Testing Strategy](#-testing-strategy)
-10. [Design System & Accessibility](#-design-system--accessibility)
+10. [Deploy to AWS with Terraform](#-deploy-to-aws-with-terraform)
+11. [Design System & Accessibility](#-design-system--accessibility)
 
 ---
 
@@ -361,6 +362,100 @@ npm test
 ```
 
 ---
+
+## ☁️ Deploy to AWS with Terraform
+
+The `terraform/` directory deploys the application to one **Amazon EC2**
+instance. The instance installs Docker, clones this public repository, builds
+the existing Dockerfile, and publishes the app on port 80. This avoids ECR,
+ECS, and a load balancer, keeping the deployment suitable for a small
+learning account. The catalog uses its checked-in product data at runtime, so
+this deployment does not create a database.
+
+### Prerequisites
+
+Install these tools on your machine:
+
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- [Terraform](https://developer.hashicorp.com/terraform/install)
+- [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
+
+You also need an AWS account with permission to create EC2 instances, VPC
+security groups, and public IP addresses. For a personal
+learning account, an administrator can create a dedicated IAM user or
+Identity Center user. Do not use the AWS root account or commit access keys.
+
+### AWS credentials
+
+The recommended setup is AWS IAM Identity Center (SSO), configured by an AWS
+account administrator:
+
+```powershell
+aws configure sso
+aws sts get-caller-identity
+```
+
+If SSO is not available, an administrator can create a dedicated IAM user in
+**AWS Console → IAM → Users → Security credentials → Create access key**.
+Choose the local CLI use case, then configure the keys locally:
+
+```powershell
+aws configure
+aws sts get-caller-identity
+```
+
+The access key and secret are shown only when created. Store them in the AWS
+CLI credential store or environment variables, never in `terraform.tfvars`,
+source code, or Git. Your administrator should grant only the permissions
+needed for this deployment; `AdministratorAccess` is convenient for a
+temporary learning account but is broader than recommended.
+
+### Deploy
+
+1. Copy the example variables file and set the region, app name, and
+   `create_service = true`:
+
+   ```powershell
+   Copy-Item terraform\terraform.tfvars.example terraform\terraform.tfvars
+   ```
+
+2. Initialize Terraform and create the EC2 instance:
+
+   ```powershell
+   terraform -chdir=terraform init
+   terraform -chdir=terraform apply -var-file=terraform.tfvars
+   ```
+
+   Terraform starts an Amazon Linux EC2 instance. Its startup script installs
+   Docker and Git, creates swap space for the Next.js build, clones the
+   repository, builds the image, and starts the container.
+
+3. Get the public URL:
+
+   ```powershell
+   terraform -chdir=terraform output -raw catalog_url
+   ```
+
+Open the printed URL after the instance finishes its startup script. The first
+deployment can take several minutes because the instance builds the Next.js
+production image before starting the container.
+
+If the page is not ready after five minutes, inspect the EC2 console's
+**Instance → Actions → Monitor and troubleshoot → Get system log**. The
+startup script output is also available in `/var/log/cloud-init-output.log`
+if you later add SSH access.
+
+### Remove AWS resources
+
+When finished, remove the resources to stop ongoing AWS charges:
+
+```powershell
+terraform -chdir=terraform destroy -var-file=terraform.tfvars
+```
+
+Terraform state contains infrastructure metadata and must be kept private.
+For a team or production deployment, store it in an encrypted remote backend
+instead of the local `terraform.tfstate` file.
 
 ## ♿ Design System & Accessibility
 

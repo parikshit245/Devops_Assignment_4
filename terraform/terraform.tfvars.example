@@ -1,0 +1,5 @@
+aws_region    = "us-east-1"
+app_name      = "lumina-catalog"
+image_tag     = "latest"
+repository_url = "https://github.com/parikshit245/Entrata-ai-coding-challange-E.git"
+instance_type = "t3.micro"

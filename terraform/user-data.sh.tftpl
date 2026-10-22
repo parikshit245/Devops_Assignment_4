@@ -1,0 +1,24 @@
+#!/bin/bash
+set -euxo pipefail
+
+dnf update -y
+dnf install -y docker git
+systemctl enable --now docker
+
+# A small instance can build the Next.js image more reliably with swap enabled.
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+
+rm -rf /opt/${app_name}
+git clone --depth 1 ${repository_url} /opt/${app_name}
+
+docker build -t ${app_name}:${image_tag} /opt/${app_name}
+docker rm -f ${app_name} || true
+docker run -d \
+  --name ${app_name} \
+  --restart unless-stopped \
+  -p 80:3000 \
+  ${app_name}:${image_tag}
