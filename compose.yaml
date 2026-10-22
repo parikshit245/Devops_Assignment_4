@@ -1,0 +1,56 @@
+name: lumina
+
+services:
+  web:
+    build: .
+    container_name: lumina-web
+    ports:
+      - "3002:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - lumina-net
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: lumina-db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5433:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lumina-net
+    restart: unless-stopped
+
+  adminer:
+    image: adminer
+    container_name: lumina-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+    networks:
+      - lumina-net
+
+volumes:
+  db_data:
+
+networks:
+  lumina-net:
+    driver: bridge

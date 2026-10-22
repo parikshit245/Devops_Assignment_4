@@ -292,6 +292,22 @@ npm run build
 npm start
 ```
 
+### Run with Docker
+
+```bash
+docker compose up -d --build
+```
+
+Open [http://localhost:3002](http://localhost:3002) for the app. Adminer is available at [http://localhost:8081](http://localhost:8081); connect with System `PostgreSQL`, Server `db`, User `lumina`, Password `lumina_pass`, and Database `lumina_db`.
+
+Stop the services with:
+
+```bash
+docker compose down
+```
+
+Use `docker compose down -v` when you also want to delete the database volume.
+
 ---
 
 ## 📜 Available Scripts
