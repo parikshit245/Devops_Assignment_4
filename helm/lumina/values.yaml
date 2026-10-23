@@ -1,0 +1,20 @@
+namespace: lumina
+
+image:
+  repository: lumina-catalog
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: NodePort
+  port: 3000
+  nodePort: 30081
+
+config:
+  nodeEnv: production
+  nextTelemetryDisabled: "1"
+
+secrets:
+  databaseUrl: ""

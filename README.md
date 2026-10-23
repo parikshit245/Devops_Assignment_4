@@ -33,6 +33,7 @@ An enterprise-grade, responsive e-commerce product catalog built with **Next.js 
 9. [Testing Strategy](#-testing-strategy)
 10. [Deploy to AWS with Terraform](#-deploy-to-aws-with-terraform)
 11. [Design System & Accessibility](#-design-system--accessibility)
+12. [Jenkins Integration with GitHub](#-jenkins-integration-with-github)
 
 ---
 
@@ -412,8 +413,7 @@ temporary learning account but is broader than recommended.
 
 ### Deploy
 
-1. Copy the example variables file and set the region, app name, and
-   `create_service = true`:
+1. Copy the example variables file and set the region and app name:
 
    ```powershell
    Copy-Item terraform\terraform.tfvars.example terraform\terraform.tfvars
@@ -456,6 +456,142 @@ terraform -chdir=terraform destroy -var-file=terraform.tfvars
 Terraform state contains infrastructure metadata and must be kept private.
 For a team or production deployment, store it in an encrypted remote backend
 instead of the local `terraform.tfstate` file.
+
+## 🔁 Jenkins Integration with GitHub
+
+This repository includes a [`Jenkinsfile`](./Jenkinsfile) for Assignment 6.
+It demonstrates automated GitHub source retrieval and runs the project's real
+CI checks:
+
+1. Checkout the configured Git branch from GitHub
+2. Verify Node.js and npm
+3. Install locked dependencies with `npm ci`
+4. Run ESLint and the TypeScript typecheck
+5. Run all 92 Vitest tests
+6. Create the production Next.js build
+
+### Jenkins prerequisites
+
+The Jenkins agent needs:
+
+- Java/JDK for Jenkins
+- Git
+- Node.js 20 or newer and npm
+- Jenkins plugins: **Pipeline**, **Git**, and **GitHub** (the GitHub plugin is
+  only needed for webhook integration)
+
+The agent must be able to run `node`, `npm`, and `git` from its PATH. No AWS
+credentials are needed for this Jenkins assignment.
+
+### Create the Jenkins job
+
+1. Open Jenkins and select **New Item**.
+2. Enter `Lumina-GitHub-CI`.
+3. Select **Pipeline**, then click **OK**.
+4. Under **Pipeline**, choose **Pipeline script from SCM**.
+5. Select **Git** and enter:
+
+   ```text
+   https://github.com/parikshit245/Entrata-ai-coding-challange-E.git
+   ```
+
+6. Set the branch to:
+
+   ```text
+   */main
+   ```
+
+7. Set **Script Path** to:
+
+   ```text
+   Jenkinsfile
+   ```
+
+8. Save and select **Build Now**.
+
+The repository is public, so credentials are not required for checkout. For a
+private repository, create a GitHub fine-grained personal access token with
+read-only repository contents access in **Jenkins → Manage Jenkins →
+Credentials**, then select that credential in the Git SCM configuration. Never
+put a token in the Jenkinsfile or commit it to Git.
+
+### Optional GitHub automatic trigger
+
+To build after every push:
+
+1. In the Jenkins job, enable **GitHub hook trigger for GITScm polling**.
+2. In GitHub, open **Settings → Webhooks → Add webhook**.
+3. Set the Payload URL to:
+
+   ```text
+   https://<your-jenkins-host>/github-webhook/
+   ```
+
+4. Select `application/json` and the **Just the push event** option.
+5. Save the webhook and push a commit to `main`.
+
+Jenkins must be reachable by GitHub for the webhook to work. If Jenkins is
+running only on `localhost`, use **Build Now** for the demo or expose it
+through an approved tunnel or public host.
+
+### Expected result
+
+The Jenkins console should show successful `Checkout`, `Install`, `Quality
+checks`, `Test`, and `Build` stages. The final result should be `SUCCESS`, and
+the workspace should contain the latest source retrieved from GitHub during
+the build.
+
+## ☸️ Kubernetes Deployment with Helm
+
+The project includes a Kubernetes package at [`helm/lumina`](./helm/lumina)
+for the K3s/Helm assignment. It creates a `lumina` namespace, one configurable
+web Deployment, a NodePort Service on port `30081`, a ConfigMap, and a Secret.
+The container listens on port `3000`, matching the [`Dockerfile`](./Dockerfile).
+
+### Build and load the image
+
+Build the production image and make it available to the K3s container runtime:
+
+```bash
+docker build -t lumina-catalog:latest .
+k3d image import lumina-catalog:latest
+```
+
+For a regular K3s installation, push the image to a registry accessible by the
+cluster and override `image.repository` and `image.tag`.
+
+### Validate, render, and deploy
+
+```bash
+helm version
+helm lint ./helm/lumina
+helm template lumina ./helm/lumina --namespace lumina
+helm upgrade --install lumina ./helm/lumina \
+  --namespace lumina \
+  --create-namespace \
+  --set image.repository=lumina-catalog \
+  --set image.tag=latest
+```
+
+The optional database value is supplied without committing credentials:
+
+```bash
+helm upgrade --install lumina ./helm/lumina \
+  --namespace lumina \
+  --create-namespace \
+  --set secrets.databaseUrl="$DATABASE_URL"
+```
+
+Inspect the release and workload:
+
+```bash
+helm list -n lumina
+helm status lumina -n lumina
+kubectl get deploy,pods,svc -n lumina
+```
+
+Open `http://<k3s-node-ip>:30081` to access the catalog. To remove only this
+release from a test cluster, run `helm uninstall lumina -n lumina`.
 
 ## ♿ Design System & Accessibility
 
